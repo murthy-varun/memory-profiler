@@ -32,6 +32,9 @@ SOFTWARE.
 #include <pthread.h>
 #include "linked_list.h"
 
+/*-----------------------------------------------------------------------------
+                                    MACROS
+-----------------------------------------------------------------------------*/
 //#define LOG_DEBUG
 #define LOG_ERROR
 #define LOG_INFO
@@ -57,6 +60,9 @@ SOFTWARE.
 #define log_debug(format, args...)
 #endif
 
+/*-----------------------------------------------------------------------------
+                          TYPE DECLARATIONS
+-----------------------------------------------------------------------------*/
 typedef void* (*orig_malloc_t)(size_t);
 typedef void* (*orig_calloc_t)(size_t, size_t);
 typedef void* (*orig_realloc_t)(void*, size_t);
@@ -67,6 +73,10 @@ typedef struct {
     size_t  alloc_sz;
     time_t  alloc_time;
 } alloc_info_t;
+
+/*-----------------------------------------------------------------------------
+                                GLOBALS
+-----------------------------------------------------------------------------*/
 
 /* Buffer to resolve calloc and dlsym inter-dependency
  * Used only for the first time */
@@ -88,7 +98,11 @@ static long long overall_alloc_sz  = 0;
 /* Linked List to store current allocations */
 static list_node_t *curr_alloc_list = NULL;
 
-int increment_overall_num_alloc()
+/*-----------------------------------------------------------------------------
+                          INTERNAL FUNCTIONS
+-----------------------------------------------------------------------------*/
+
+static int increment_overall_num_alloc()
 {
     pthread_mutex_lock(&alloc_lock);
     overall_num_alloc++;
@@ -96,7 +110,7 @@ int increment_overall_num_alloc()
     return 0;
 }
 
-int add_overall_alloc_sz(size_t size)
+static int add_overall_alloc_sz(size_t size)
 {
     pthread_mutex_lock(&alloc_lock);
     overall_alloc_sz += size;
@@ -104,19 +118,15 @@ int add_overall_alloc_sz(size_t size)
     return 0;
 }
 
-int add_curr_alloc_list(void *ptr, size_t size)
+static int add_curr_alloc_list(void *ptr, size_t size)
 {
-    if(!orig_malloc) {
-        return -1;
-    }
-
-    list_node_t *node = (list_node_t*)orig_malloc(sizeof(list_node_t));
+    list_node_t *node = (list_node_t*)orig_calloc(1, sizeof(list_node_t));
     if (!node) {
         log_error("Could not allocate lined list node for %p\n", ptr);
         return -1;
     }
     alloc_info_t *info
-        = (alloc_info_t*)orig_malloc(sizeof(alloc_info_t));
+        = (alloc_info_t*)orig_calloc(1, sizeof(alloc_info_t));
     info->alloc_sz = size;
     time(&info->alloc_time);
     node->key = ptr;
@@ -130,7 +140,7 @@ int add_curr_alloc_list(void *ptr, size_t size)
     return 0;
 }
 
-int del_curr_alloc_list(void *ptr)
+static int del_curr_alloc_list(void *ptr)
 {
     list_node_t *node = NULL;
 
@@ -149,7 +159,7 @@ int del_curr_alloc_list(void *ptr)
     return 0;
 }
 
-void print_stats(bool no_check)
+static void print_stats(bool force_print)
 {
     static time_t  time_last_printed = 0;
     static time_t  curr_time;
@@ -159,8 +169,10 @@ void print_stats(bool no_check)
     long long      curr_alloc_sz = 0;
     long           curr_num_alloc = 0;
 
+    /* Print stats if 5 seconds have elapsed since last print
+    Or Force print */
     time(&curr_time);
-    if((no_check == false) &&(curr_time - time_last_printed) < 5) {
+    if((force_print == false) &&(curr_time - time_last_printed) < 5) {
         return;
     }
     time_last_printed = curr_time;
@@ -168,6 +180,7 @@ void print_stats(bool no_check)
     pthread_mutex_lock(&alloc_lock);
     current = curr_alloc_list;    
 
+    /* Traverse Linked list */
     while(current != NULL) {
         alloc_info_t *info = (alloc_info_t*)current->val;
         curr_num_alloc++;
@@ -187,9 +200,13 @@ void print_stats(bool no_check)
     log_info("Current Stats:\n");
     log_info("Current number of allocations:%ld\n", curr_num_alloc);
     log_info("Current allocation size:%lld\n\n\n", curr_alloc_sz);
+    //log_info("\nCurrent allocations by size:\n");
     return;
 }
 
+/*-----------------------------------------------------------------------------
+                          EXTERNAL FUNCTIONS
+-----------------------------------------------------------------------------*/
 void* malloc(size_t size)
 {
     void* ret_ptr = NULL;
@@ -282,13 +299,17 @@ void free(void* ptr)
     if(ptr != alloc_buff) {
         orig_free(ptr);
         if(ptr) {
-            del_curr_alloc_list(ptr);
-            print_stats(false);
+            del_curr_alloc_list(ptr);            
         }
+        print_stats(false);
     }
     return;
 }
 
+
+/*-----------------------------------------------------------------------------
+                    GCC constructor and destructor - Unused
+-----------------------------------------------------------------------------*/
 __attribute__ ((constructor)) void init(void)
 {
     log_debug("Memory Profiler Constructor called!!\n");
@@ -300,4 +321,3 @@ __attribute__ ((destructor)) void fini(void)
     print_stats(true);
     return;
 }
-

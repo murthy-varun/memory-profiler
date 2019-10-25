@@ -227,16 +227,21 @@ int main()
 
     if(free_all) {
         /* cleaning up all pending memory */
-        //fprintf(stderr, "\n\nCLEANING UP \n\n");
+        log("\n\nCLEANING UP \n\n");
         for(ptr_indx = 0; ptr_indx < MAX_NUM_PTRS; ptr_indx++) {
             if(ptr[ptr_indx]) {
-                //fprintf(stderr, "Freeing memory \tptr[%d]:%p\n", ptr_indx, ptr[ptr_indx]);
+                log("Freeing memory \tptr[%d]:%p\n", ptr_indx, ptr[ptr_indx]);
                 free(ptr[ptr_indx]);
                 ptr[ptr_indx] = NULL;
             }
         }
     }
     sleep(5);
+
+	/* call print stats once before the test ends 
+		Note: free(NULL) is safe and ignored as per C standard
+	*/
+	free(NULL);
 
     return 0;
 }
