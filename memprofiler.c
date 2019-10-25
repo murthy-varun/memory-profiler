@@ -125,7 +125,7 @@ static list_node_t *curr_alloc_list = NULL;
                           INTERNAL FUNCTIONS
 -----------------------------------------------------------------------------*/
 
-static int increment_overall_num_alloc()
+static int increment_overall_num_alloc(void)
 {
     pthread_mutex_lock(&alloc_lock);
     overall_num_alloc++;
@@ -187,6 +187,7 @@ static void fill_curr_size_info(alloc_size_info_t *alloc_size_info, size_t size)
     if(!alloc_size_info) {
         return;
     }
+
     if(size <= 4) {
         alloc_size_info->under_4B++;
     }
@@ -255,6 +256,8 @@ static void fill_curr_age_info(alloc_age_info_t *alloc_age_info, time_t curr_tim
     else {
         alloc_age_info->over_1000s++;
     }
+
+    return;
 }
 
 static void print_curr_size_info(alloc_size_info_t *alloc_size_info)
@@ -308,8 +311,8 @@ static void print_stats(bool force_print)
     alloc_size_info_t  curr_alloc_sz_info = {0};
     alloc_age_info_t   curr_alloc_age_info = {0};
 
-    /* Print stats if 5 seconds have elapsed since last print
-    Or Force print */
+    /* print stats if 5 seconds have elapsed since last print
+       or force print */
     time(&curr_time);
     if((force_print == false) &&(curr_time - time_last_printed) < 5) {
         return;
@@ -332,7 +335,6 @@ static void print_stats(bool force_print)
 
     ovrl_alloc_sz  = overall_alloc_sz;
     ovrl_num_alloc = overall_num_alloc;
-
     pthread_mutex_unlock(&alloc_lock);
 
     log_info("\n\n>>>>>>>>>> %s", ctime(&curr_time));
@@ -355,12 +357,16 @@ void* malloc(size_t size)
 {
     void* ret_ptr = NULL;
 
+    /* assign "real" malloc function to func_ptr using dlsym */
     if(orig_malloc == NULL) {
         orig_malloc = (orig_malloc_t)dlsym(RTLD_NEXT, "malloc");
     }
 
+    /* call "real" malloc function */
     ret_ptr = orig_malloc(size);
     log_debug("malloc size:%ld ret_ptr:%p\n", size, ret_ptr);
+
+    /* update stats */
     if(ret_ptr) {
         increment_overall_num_alloc();
         add_overall_alloc_sz(size);
@@ -374,18 +380,24 @@ void* calloc(size_t nmemb, size_t size)
 {
     void* ret_ptr = NULL;
 
+    /* dlsym calls calloc, to avoid endless recursion 
+       return static allocated buffer */
     if(no_hook && orig_calloc == NULL) {
         return alloc_buff;
     }
 
+    /* assign "real" calloc function to func_ptr using dlsym */
     if(orig_calloc == NULL) {
         no_hook = 1;
         orig_calloc = (orig_calloc_t)dlsym(RTLD_NEXT, "calloc");
         no_hook = 0;
     }
 
+    /* call "real" calloc function */
     ret_ptr = orig_calloc(nmemb, size);
     log_debug("calloc size:%ld*%ld ret_ptr:%p\n", nmemb, size, ret_ptr);
+
+    /* update stats */
     if(ret_ptr) {
         increment_overall_num_alloc();
         add_overall_alloc_sz(nmemb * size);
@@ -402,13 +414,16 @@ void* realloc(void* ptr, size_t size)
     void *ret_ptr = NULL;
     size_t curr_size = 0;
 
+    /* assign "real" realloc function to func_ptr using dlsym */
     if(orig_realloc == NULL) {
         orig_realloc = (orig_realloc_t)dlsym(RTLD_NEXT, "realloc");
     }
 
+    /* call "real" realloc function */
     ret_ptr = orig_realloc(ptr, size);
     log_debug("realloc ptr:%p size:%ld ret_ptr:%p\n", ptr, size, ret_ptr);
 
+    /* update stats */
     if(ptr) {
         /* get current alloc size */
         pthread_mutex_lock(&alloc_lock);
@@ -435,13 +450,18 @@ void* realloc(void* ptr, size_t size)
 
 void free(void* ptr)
 {
+    /* assign "real" free function to func_ptr using dlsym */
     if(orig_free == NULL) {
         orig_free = (orig_free_t)dlsym(RTLD_NEXT, "free");
     }
 
     log_debug("free %p\n", ptr);
+
+    /* Do not free the static buffer */
     if(ptr != alloc_buff) {
         orig_free(ptr);
+
+        /* update stats */
         if(ptr) {
             del_curr_alloc_list(ptr);            
         }
@@ -453,6 +473,8 @@ void free(void* ptr)
 
 /*-----------------------------------------------------------------------------
                     GCC constructor and destructor - Unused
+Cannot use constructors to assign pointers since constructor (init) is not
+guaranteed to be invoked before other memory alloc functions.
 -----------------------------------------------------------------------------*/
 __attribute__ ((constructor)) void init(void)
 {

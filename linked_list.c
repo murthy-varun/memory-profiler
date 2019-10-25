@@ -27,6 +27,10 @@ SOFTWARE.
 
 void list_insert(list_node_t **head, list_node_t *node)
 {
+	if(!head) {
+		return;
+	}
+
 	/* Always insert at head */
     node->next = *head;
 	*head = node;
@@ -35,7 +39,13 @@ void list_insert(list_node_t **head, list_node_t *node)
 
 void* list_delete(list_node_t **head, void *key)
 {
-	list_node_t *current = *head;
+	list_node_t *current = NULL;
+	
+	if(!head) {
+		return NULL;
+	}
+
+	current = *head;
 
 	/* special case for head */
 	if (current != NULL && current->key == key) {
