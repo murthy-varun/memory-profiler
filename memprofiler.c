@@ -74,6 +74,29 @@ typedef struct {
     time_t  alloc_time;
 } alloc_info_t;
 
+typedef struct {
+    long  under_4B;
+    long  btwn_4B_8B;
+    long  btwn_8B_16B;
+    long  btwn_16B_32B;
+    long  btwn_32B_64B;
+    long  btwn_64B_128B;
+    long  btwn_128B_256B;
+    long  btwn_256B_512B;
+    long  btwn_512B_1024B;
+    long  btwn_1024B_2048B;
+    long  btwn_2048B_4096B;
+    long  over_4096B;
+} alloc_size_info_t;
+
+typedef struct {
+    long  under_1s;
+    long  btwn_1s_10s;
+    long  btwn_10s_100s;
+    long  btwn_100s_1000s;
+    long  over_1000s;
+} alloc_age_info_t;
+
 /*-----------------------------------------------------------------------------
                                 GLOBALS
 -----------------------------------------------------------------------------*/
@@ -159,15 +182,131 @@ static int del_curr_alloc_list(void *ptr)
     return 0;
 }
 
+static void fill_curr_size_info(alloc_size_info_t *alloc_size_info, size_t size)
+{
+    if(!alloc_size_info) {
+        return;
+    }
+    if(size <= 4) {
+        alloc_size_info->under_4B++;
+    }
+    else if(size > 4 && size <= 8) {
+        alloc_size_info->btwn_4B_8B++;
+    }
+    else if(size > 8 && size <= 16) {
+        alloc_size_info->btwn_8B_16B++;
+    }
+    else if(size > 16 && size <= 32) {
+        alloc_size_info->btwn_16B_32B++;
+    }
+    else if(size > 32 && size <= 64) {
+        alloc_size_info->btwn_32B_64B++;
+    }
+    else if(size > 64 && size <= 128) {
+        alloc_size_info->btwn_64B_128B++;
+    }
+    else if(size > 128 && size <= 256) {
+        alloc_size_info->btwn_128B_256B++;
+    }
+    else if(size > 256 && size <= 512) {
+        alloc_size_info->btwn_256B_512B++;
+    }
+    else if(size > 512 && size <= 1024) {
+        alloc_size_info->btwn_512B_1024B++;
+    }
+    else if(size > 1024 && size <= 2048) {
+        alloc_size_info->btwn_1024B_2048B++;
+    }
+    else if(size > 2048 && size <= 4096) {
+        alloc_size_info->btwn_2048B_4096B++;
+    }
+    else {
+        alloc_size_info->over_4096B++;
+    }
+
+    return;
+}
+
+static void fill_curr_age_info(alloc_age_info_t *alloc_age_info, time_t curr_time, time_t alloc_time)
+{
+    long time_diff = 0;
+    
+    if(!alloc_age_info) {
+        return;
+    }
+
+    if(curr_time < alloc_time) {
+        return;
+    }
+    time_diff = curr_time - alloc_time;
+
+    if(time_diff <= 1) {
+        alloc_age_info->under_1s++;
+    }
+    else if(time_diff > 1 && time_diff <= 10) {
+        alloc_age_info->btwn_1s_10s++;
+    }
+    else if(time_diff > 10 && time_diff <= 100) {
+        alloc_age_info->btwn_10s_100s++;
+    }
+    else if(time_diff > 100 && time_diff <= 1000) {
+        alloc_age_info->btwn_100s_1000s++;
+    }
+    else {
+        alloc_age_info->over_1000s++;
+    }
+}
+
+static void print_curr_size_info(alloc_size_info_t *alloc_size_info)
+{
+    if(!alloc_size_info) {
+        return;
+    }
+
+    log_info("\nCurrent allocations by size:\n");
+    log_info("0 - 4 bytes: %ld\n", alloc_size_info->under_4B);
+    log_info("4 - 8 bytes: %ld\n", alloc_size_info->btwn_4B_8B);
+    log_info("8 - 16 bytes: %ld\n", alloc_size_info->btwn_8B_16B);
+    log_info("16 - 32 bytes: %ld\n", alloc_size_info->btwn_16B_32B);
+    log_info("32 - 64 bytes: %ld\n", alloc_size_info->btwn_32B_64B);
+    log_info("64 - 128 bytes: %ld\n", alloc_size_info->btwn_64B_128B);
+    log_info("128 - 256 bytes: %ld\n", alloc_size_info->btwn_128B_256B);
+    log_info("256 - 512 bytes: %ld\n", alloc_size_info->btwn_256B_512B);
+    log_info("512 - 1024 bytes: %ld\n", alloc_size_info->btwn_512B_1024B);
+    log_info("1024 - 2048 bytes: %ld\n", alloc_size_info->btwn_1024B_2048B);
+    log_info("2048 - 4096 bytes: %ld\n", alloc_size_info->btwn_2048B_4096B);
+    log_info("4096+ bytes: %ld\n", alloc_size_info->over_4096B);
+
+    return;
+}
+
+static void print_curr_age_info(alloc_age_info_t *alloc_age_info)
+{
+    if(!alloc_age_info) {
+        return;
+    }
+
+    log_info("\nCurrent allocations by age:\n");
+    log_info("0 - 1 sec: %ld\n", alloc_age_info->under_1s);
+    log_info("1 - 10 sec: %ld\n", alloc_age_info->btwn_1s_10s);
+    log_info("10 - 100 sec: %ld\n", alloc_age_info->btwn_10s_100s);
+    log_info("100 - 1000 sec: %ld\n", alloc_age_info->btwn_100s_1000s);
+    log_info("1000+ sec: %ld\n", alloc_age_info->over_1000s);
+
+    return;
+}
+
 static void print_stats(bool force_print)
 {
-    static time_t  time_last_printed = 0;
-    static time_t  curr_time;
-    list_node_t   *current = NULL;
-    size_t         ovrl_alloc_sz = 0;
-    long           ovrl_num_alloc = 0;
-    long long      curr_alloc_sz = 0;
-    long           curr_num_alloc = 0;
+    static time_t      time_last_printed = 0;
+    static time_t      curr_time;
+    list_node_t       *current = NULL;
+    size_t             ovrl_alloc_sz = 0;
+    long               ovrl_num_alloc = 0;
+    long long          curr_alloc_sz = 0;
+    long               curr_num_alloc = 0;
+    alloc_size_info_t  curr_alloc_sz_info = {0};
+    alloc_age_info_t   curr_alloc_age_info = {0};
 
     /* Print stats if 5 seconds have elapsed since last print
     Or Force print */
@@ -186,6 +325,9 @@ static void print_stats(bool force_print)
         curr_num_alloc++;
         curr_alloc_sz += info->alloc_sz;
         current = current->next;
+
+        fill_curr_size_info(&curr_alloc_sz_info, info->alloc_sz);
+        fill_curr_age_info(&curr_alloc_age_info, curr_time, info->alloc_time);
     }
 
     ovrl_alloc_sz  = overall_alloc_sz;
@@ -193,14 +335,16 @@ static void print_stats(bool force_print)
 
     pthread_mutex_unlock(&alloc_lock);
 
-    log_info("\n>>>>>>>>>> %s", ctime(&curr_time));
+    log_info("\n\n>>>>>>>>>> %s", ctime(&curr_time));
     log_info("Overall Stats:\n");
     log_info("Overall number of allocations: %ld\n", ovrl_num_alloc);
     log_info("Overall allocation size:%ld \n\n", ovrl_alloc_sz);
     log_info("Current Stats:\n");
     log_info("Current number of allocations:%ld\n", curr_num_alloc);
-    log_info("Current allocation size:%lld\n\n\n", curr_alloc_sz);
-    //log_info("\nCurrent allocations by size:\n");
+    log_info("Current allocation size:%lld\n", curr_alloc_sz);
+    
+    print_curr_size_info(&curr_alloc_sz_info);
+    print_curr_age_info(&curr_alloc_age_info);
     return;
 }
 
