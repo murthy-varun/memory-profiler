@@ -3,7 +3,6 @@ Memory profiler using wrapper around memory allocation functions and utilizing L
 
 ## Index
  - Development Environment
- - Extraction Instructions
  - Build Instructions
  - Design details
  - Source code structure
