@@ -29,6 +29,7 @@ SOFTWARE.
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 #include <pthread.h>
 #include "linked_list.h"
 
@@ -231,7 +232,7 @@ static void fill_curr_size_info(alloc_size_info_t *alloc_size_info, size_t size)
 static void fill_curr_age_info(alloc_age_info_t *alloc_age_info, time_t curr_time, time_t alloc_time)
 {
     long time_diff = 0;
-    
+
     if(!alloc_age_info) {
         return;
     }
@@ -320,7 +321,7 @@ static void print_stats(bool force_print)
     time_last_printed = curr_time;
 
     pthread_mutex_lock(&alloc_lock);
-    current = curr_alloc_list;    
+    current = curr_alloc_list;
 
     /* Traverse Linked list */
     while(current != NULL) {
@@ -344,7 +345,7 @@ static void print_stats(bool force_print)
     log_info("Current Stats:\n");
     log_info("Current number of allocations:%ld\n", curr_num_alloc);
     log_info("Current allocation size:%lld\n", curr_alloc_sz);
-    
+
     print_curr_size_info(&curr_alloc_sz_info);
     print_curr_age_info(&curr_alloc_age_info);
     return;
@@ -360,6 +361,27 @@ void* malloc(size_t size)
     /* assign "real" malloc function to func_ptr using dlsym */
     if(orig_malloc == NULL) {
         orig_malloc = (orig_malloc_t)dlsym(RTLD_NEXT, "malloc");
+        if(!orig_malloc) {
+            assert(0);
+        }
+    }
+    if(orig_calloc == NULL) {
+        orig_calloc = (orig_calloc_t)dlsym(RTLD_NEXT, "calloc");
+        if(!orig_calloc) {
+            assert(0);
+        }
+    }
+    if(orig_realloc == NULL) {
+        orig_realloc = (orig_realloc_t)dlsym(RTLD_NEXT, "realloc");
+        if(!orig_realloc) {
+            assert(0);
+        }
+    }
+    if(orig_free == NULL) {
+        orig_free = (orig_free_t)dlsym(RTLD_NEXT, "free");
+        if(!orig_free) {
+            assert(0);
+        }
     }
 
     /* call "real" malloc function */
@@ -380,7 +402,7 @@ void* calloc(size_t nmemb, size_t size)
 {
     void* ret_ptr = NULL;
 
-    /* dlsym calls calloc, to avoid endless recursion 
+    /* dlsym calls calloc, to avoid endless recursion
        return static allocated buffer */
     if(no_hook && orig_calloc == NULL) {
         return alloc_buff;
@@ -391,6 +413,24 @@ void* calloc(size_t nmemb, size_t size)
         no_hook = 1;
         orig_calloc = (orig_calloc_t)dlsym(RTLD_NEXT, "calloc");
         no_hook = 0;
+    }
+    if(orig_malloc == NULL) {
+        orig_malloc = (orig_malloc_t)dlsym(RTLD_NEXT, "malloc");
+        if(!orig_malloc) {
+            assert(0);
+        }
+    }
+    if(orig_realloc == NULL) {
+        orig_realloc = (orig_realloc_t)dlsym(RTLD_NEXT, "realloc");
+        if(!orig_realloc) {
+            assert(0);
+        }
+    }
+    if(orig_free == NULL) {
+        orig_free = (orig_free_t)dlsym(RTLD_NEXT, "free");
+        if(!orig_free) {
+            assert(0);
+        }
     }
 
     /* call "real" calloc function */
@@ -417,6 +457,24 @@ void* realloc(void* ptr, size_t size)
     /* assign "real" realloc function to func_ptr using dlsym */
     if(orig_realloc == NULL) {
         orig_realloc = (orig_realloc_t)dlsym(RTLD_NEXT, "realloc");
+    }
+    if(orig_malloc == NULL) {
+        orig_malloc = (orig_malloc_t)dlsym(RTLD_NEXT, "malloc");
+        if(!orig_malloc) {
+            assert(0);
+        }
+    }
+    if(orig_calloc == NULL) {
+        orig_calloc = (orig_calloc_t)dlsym(RTLD_NEXT, "calloc");
+        if(!orig_calloc) {
+            assert(0);
+        }
+    }    
+    if(orig_free == NULL) {
+        orig_free = (orig_free_t)dlsym(RTLD_NEXT, "free");
+        if(!orig_free) {
+            assert(0);
+        }
     }
 
     /* call "real" realloc function */
@@ -454,6 +512,24 @@ void free(void* ptr)
     if(orig_free == NULL) {
         orig_free = (orig_free_t)dlsym(RTLD_NEXT, "free");
     }
+    if(orig_malloc == NULL) {
+        orig_malloc = (orig_malloc_t)dlsym(RTLD_NEXT, "malloc");
+        if(!orig_malloc) {
+            assert(0);
+        }
+    }
+    if(orig_calloc == NULL) {
+        orig_calloc = (orig_calloc_t)dlsym(RTLD_NEXT, "calloc");
+        if(!orig_calloc) {
+            assert(0);
+        }
+    }
+    if(orig_realloc == NULL) {
+        orig_realloc = (orig_realloc_t)dlsym(RTLD_NEXT, "realloc");
+        if(!orig_realloc) {
+            assert(0);
+        }
+    }
 
     log_debug("free %p\n", ptr);
 
@@ -463,7 +539,7 @@ void free(void* ptr)
 
         /* update stats */
         if(ptr) {
-            del_curr_alloc_list(ptr);            
+            del_curr_alloc_list(ptr);
         }
         print_stats(false);
     }

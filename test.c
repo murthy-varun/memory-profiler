@@ -50,6 +50,7 @@ typedef enum {
 
 int main(int argc, char *argv[])
 {
+#if 0
 	uint16_t  num_iter = 20;
 	int      *ptr[MAX_NUM_PTRS] = {NULL};
 	uint32_t  size_arr[MAX_MEMSIZE] = {1, 1024, 1024*1024};
@@ -139,6 +140,20 @@ int main(int argc, char *argv[])
 		}
 	}
 	sleep(5);
+#endif
+	int *i, *j, *k;
+	i = malloc(sizeof(int));
+	sleep(6);
+
+	j = malloc(sizeof(int));
+	sleep(6);
+
+	k = malloc(sizeof(int));
+	sleep(6);
+	
+	free(i);
+	free(j);
+	free(k);
 
 	return 0;
 }
