@@ -64,3 +64,8 @@ Tested Ubuntu 18.04.3 LTS
 4. number of iterations = 20
 5. Main thread waits until all threads are finished executing.
 6. Main thread cleans up any allocations which are not yet freed up. 
+
+## TODO
+* Replace fprintf with custom function to print
+* Replace Linked list with better structures
+
