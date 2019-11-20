@@ -36,27 +36,32 @@ SOFTWARE.
 /*-----------------------------------------------------------------------------
                                     MACROS
 -----------------------------------------------------------------------------*/
+static char log_msg[256];
+
 //#define LOG_DEBUG
 #define LOG_ERROR
 #define LOG_INFO
 
 #ifdef LOG_ERROR
 #define log_error(format, args...) \
-    fprintf(stderr, "ERR:\t"format, ##args)
+    snprintf(log_msg, 256, "ERR:\t"format, ##args); \
+    fputs(log_msg, stderr);
 #else
 #define log_error(format, args...)
 #endif
 
 #ifdef LOG_INFO
 #define log_info(format, args...) \
-    fprintf(stderr, format, ##args)
+    snprintf(log_msg, 256, format, ##args); \
+    fputs(log_msg, stderr);
 #else
 #define log_info(format, args...)
 #endif
 
 #ifdef LOG_DEBUG
 #define log_debug(format, args...) \
-    fprintf(stderr, "DBG:\t"format, ##args)
+    snprintf(log_msg, 256, "DBG:\t"format, ##args); \
+    fputs(log_msg, stderr);
 #else
 #define log_debug(format, args...)
 #endif
